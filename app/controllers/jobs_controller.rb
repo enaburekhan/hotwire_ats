@@ -21,31 +21,39 @@ class JobsController < ApplicationController
 
   # GET /jobs/1/edit
   def edit
+    html = render_to_string(partial: 'form', locals: { job: @job })
+    render operations: cable_car
+    .inner_html('#slideover-content', html: html)
+    .text_content('#slideover-header', text: 'Update job')
   end
 
   # POST /jobs or /jobs.json
   def create
     @job = Job.new(job_params)
     @job.account = current_user.account
-
     if @job.save
-      redirect_to @job, notice: "Job was successfully created." 
+      html = render_to_string(partial: 'job', locals: { job: @job })
+      render operations: cable_car
+        .prepend('#jobs', html: html)
+        .dispatch_event(name: 'submit:success')
     else
-      render :new, status: :unprocessable_entity 
+      html = render_to_string(partial: 'form', locals: { job: @job })
+      render operations: cable_car
+        .inner_html('#job-form', html: html), status: :unprocessable_entity
     end
-   
   end
 
   # PATCH/PUT /jobs/1 or /jobs/1.json
   def update
-    respond_to do |format|
-      if @job.update(job_params)
-        format.html { redirect_to job_url(@job), notice: "Job was successfully updated." }
-        format.json { render :show, status: :ok, location: @job }
-      else
-        format.html { render :edit, status: :unprocessable_entity }
-        format.json { render json: @job.errors, status: :unprocessable_entity }
-      end
+    if @job.update(job_params)
+      html = render_to_string(partial: 'job', locals: { job: @job })
+      render operations: cable_car
+        .replace(dom_id(@job), html: html)
+        .dispatch_event(name: 'submit:success')
+    else
+      html = render_to_string(partial: 'form', locals: { job: @job })
+      render operations: cable_car
+        .inner_html('#job-form', html: html), status: :unprocessable_entity
     end
   end
 
@@ -53,10 +61,7 @@ class JobsController < ApplicationController
   def destroy
     @job.destroy
 
-    respond_to do |format|
-      format.html { redirect_to jobs_url, notice: "Job was successfully destroyed." }
-      format.json { head :no_content }
-    end
+    render operations: cable_car.remove(selector: dom_id(@job))
   end
 
   private
@@ -67,6 +72,6 @@ class JobsController < ApplicationController
 
     # Only allow a list of trusted parameters through.
     def job_params
-      params.require(:job).permit(:title, :status, :job_type, :location, :account_id)
+      params.require(:job).permit(:title, :status, :job_type, :location, :account_id, :description)
     end
 end
