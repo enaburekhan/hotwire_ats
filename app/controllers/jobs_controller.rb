@@ -13,10 +13,7 @@ class JobsController < ApplicationController
 
   # GET /jobs/new
   def new
-    html = render_to_string(partial: 'form', locals: { job: Job.new })
-    render operations: cable_car
-      .inner_html('#slideover-content', html: html)
-      .text_content('#slideover-header', text: 'Post a new job')
+   @job = Job.new
   end
 
   # GET /jobs/1/edit
@@ -32,14 +29,17 @@ class JobsController < ApplicationController
     @job = Job.new(job_params)
     @job.account = current_user.account
     if @job.save
-      html = render_to_string(partial: 'job', locals: { job: @job })
-      render operations: cable_car
-        .prepend('#jobs', html: html)
-        .dispatch_event(name: 'submit:success')
+      render turbo_stream: turbo_stream.prepend(
+        'jobs',
+        partial: 'job',
+        locals: { job: @job }
+      )
     else
-      html = render_to_string(partial: 'form', locals: { job: @job })
-      render operations: cable_car
-        .inner_html('#job-form', html: html), status: :unprocessable_entity
+      render turbo_stream: turbo_stream.replace(
+        'job-form',
+        partial: 'form',
+        locals: { job: @job }
+      ), status: :unprocessable_entity
     end
   end
 
@@ -61,7 +61,7 @@ class JobsController < ApplicationController
   def destroy
     @job.destroy
 
-    render operations: cable_car.remove(selector: dom_id(@job))
+    render turbo_stream: turbo_stream.remove(@job)
   end
 
   private
